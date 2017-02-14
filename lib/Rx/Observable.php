@@ -64,6 +64,7 @@ use Rx\Operator\ThrottleOperator;
 use Rx\Operator\TimeoutOperator;
 use Rx\Operator\TimestampOperator;
 use Rx\Operator\ToArrayOperator;
+use Rx\Operator\WindowOperator;
 use Rx\Operator\ZipOperator;
 use Rx\Scheduler\ImmediateScheduler;
 use Rx\Subject\AsyncSubject;
@@ -1885,6 +1886,13 @@ class Observable implements ObservableInterface
     {
         return $this->lift(function() use ($callback) {
             return new DoFinallyOperator($callback);
+        });
+    }
+
+    public function window(Observable $windowBoundaries)
+    {
+        return $this->lift(function() use ($windowBoundaries) {
+            return new WindowOperator($windowBoundaries);
         });
     }
 }
