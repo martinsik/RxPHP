@@ -59,8 +59,12 @@ abstract class FunctionalTestCase extends TestCase
         $this->assertTrue(true); // success
     }
 
-    public function assertSubscriptions(array $expected, array $recorded)
+    public function assertSubscriptions($expected, array $recorded, $starTime = 0)
     {
+        if (is_string($expected)) {
+            $expected = $this->convertMarblesToSubscriptions($expected, $starTime);
+        }
+
         if (count($expected) !== count($recorded)) {
             $this->fail(sprintf('Expected subscription count %d does not match actual count %d.', count($expected), count($recorded)));
         }
@@ -113,9 +117,36 @@ abstract class FunctionalTestCase extends TestCase
         return new TestScheduler();
     }
 
+    protected function convertMarblesToSubscriptions(string $marbles, $startTime = 0)
+    {
+        $latestSubscriptionTime = null;
+        $events = [];
+
+        for ($i = 0; $i < strlen($marbles); $i++) {
+            switch ($marbles[$i]) {
+                case '^': // subscribe
+                    if ($latestSubscriptionTime) {
+                        throw new \Exception('Trying to subscribe before unsubscribing the previous subscription.');
+                    }
+                    $zero = $i * 10;
+                    $latestSubscriptionTime = $zero;
+                    continue;
+                case '!': // unsubscribe
+                    $events[] = new Subscription($startTime + $latestSubscriptionTime, $startTime + $i * 10);
+                    $latestSubscriptionTime = null;
+                    break;
+            }
+        }
+
+        if ($latestSubscriptionTime) {
+            $events[] = new Subscription($startTime + $latestSubscriptionTime);
+        }
+
+        return $events;
+    }
+
     protected function convertMarblesToMessages(string $marbles, array $eventMap = [], \Exception $customError = null, $subscribePoint = 0)
     {
-        var_dump($eventMap);
         /** @var Recorded $events */
         $events = [];
         $zero = 0;
@@ -123,6 +154,7 @@ abstract class FunctionalTestCase extends TestCase
         for ($i = 0; $i < strlen($marbles); $i++) {
             switch ($marbles[$i]) {
                 case '-': // nothing
+                case ' ':
                     continue;
                 case '#': // error
                     $events[] = onError($i * 10, $customError ?? new \Exception());
@@ -134,7 +166,8 @@ abstract class FunctionalTestCase extends TestCase
                     $events[] = onCompleted($i * 10);
                     continue;
                 default:
-                    $events[] = onNext($i * 10, isset($eventMap[$i]) ? $eventMap[$i] : $marbles[$i]);
+                    $eventKey = $marbles[$i];
+                    $events[] = onNext($i * 10, isset($eventMap[$eventKey]) ? $eventMap[$eventKey] : $marbles[$i]);
                     continue;
             }
         }
